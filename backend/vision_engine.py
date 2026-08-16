@@ -1,92 +1,128 @@
 from PIL import Image
-from transformers import pipeline
+import os
 
 
-# ==========================================
-# COMPUTER VISION CLASSIFIER
-# ==========================================
-
-print("Loading RailAI Computer Vision model...")
-
-
-vision_classifier = pipeline(
-    "zero-shot-image-classification",
-    model="openai/clip-vit-base-patch32"
-)
+# ============================================================
+# LIGHTWEIGHT RAILAI VISION ENGINE
+# ============================================================
+# Cloud-friendly version.
+#
+# This version does NOT load CLIP / Transformers / PyTorch.
+# It keeps image upload and basic visual analysis working
+# without consuming large amounts of RAM.
+# ============================================================
 
 
-print("Computer Vision model loaded.")
+print("RailAI lightweight Computer Vision engine loaded.")
 
 
-# ==========================================
-# VISUAL LABELS
-# ==========================================
-
-VISION_LABELS = [
-
-    "fire or smoke inside a railway coach",
-
-    "garbage or dirty railway coach",
-
-    "water leakage inside a railway coach",
-
-    "damaged railway seat or broken interior",
-
-    "electrical damage inside a railway coach",
-
-    "crowded railway coach",
-
-    "normal clean railway coach",
-
-    "railway equipment problem"
-
-]
-
-
-# ==========================================
-# ANALYZE IMAGE
-# ==========================================
+# ============================================================
+# VISUAL ANALYSIS
+# ============================================================
 
 def analyze_image(image_path):
 
     try:
 
-        image = Image.open(
-            image_path
-        ).convert("RGB")
+        # ----------------------------------------------------
+        # Open image
+        # ----------------------------------------------------
+
+        image = Image.open(image_path).convert("RGB")
+
+        width, height = image.size
+
+        # ----------------------------------------------------
+        # Basic image statistics
+        # ----------------------------------------------------
+
+        # Resize for quick processing
+        small_image = image.resize((100, 100))
+
+        pixels = list(small_image.getdata())
+
+        total_pixels = len(pixels)
+
+        if total_pixels == 0:
+
+            raise ValueError("Image contains no pixels")
 
 
-        results = vision_classifier(
+        # Average RGB values
+        avg_r = sum(pixel[0] for pixel in pixels) / total_pixels
+        avg_g = sum(pixel[1] for pixel in pixels) / total_pixels
+        avg_b = sum(pixel[2] for pixel in pixels) / total_pixels
 
-            image,
+        brightness = (
+            avg_r + avg_g + avg_b
+        ) / 3
 
-            candidate_labels=VISION_LABELS
 
+        # ----------------------------------------------------
+        # Basic color detection
+        # ----------------------------------------------------
+
+        red_or_orange_pixels = 0
+
+        dark_pixels = 0
+
+        gray_pixels = 0
+
+        for r, g, b in pixels:
+
+            # Possible fire-like colors
+            if (
+                r > 150
+                and r > g * 1.25
+                and g > b * 1.15
+            ):
+
+                red_or_orange_pixels += 1
+
+
+            # Very dark pixels
+            if (
+                r < 60
+                and g < 60
+                and b < 60
+            ):
+
+                dark_pixels += 1
+
+
+            # Gray pixels
+            if (
+                abs(r - g) < 15
+                and abs(g - b) < 15
+            ):
+
+                gray_pixels += 1
+
+
+        fire_ratio = (
+            red_or_orange_pixels / total_pixels
+        )
+
+        dark_ratio = (
+            dark_pixels / total_pixels
+        )
+
+        gray_ratio = (
+            gray_pixels / total_pixels
         )
 
 
-        # ----------------------------------
-        # BEST RESULT
-        # ----------------------------------
+        # ====================================================
+        # BASIC VISUAL RULES
+        # ====================================================
 
-        best_result = results[0]
+        # ----------------------------------------------------
+        # Possible fire / smoke
+        # ----------------------------------------------------
 
+        if fire_ratio > 0.12:
 
-        label = best_result[
-            "label"
-        ]
-
-
-        confidence = best_result[
-            "score"
-        ]
-
-
-        # ----------------------------------
-        # MAP VISION RESULT
-        # ----------------------------------
-
-        if "fire" in label.lower():
+            label = "Possible fire or smoke"
 
             issue = "Fire / Smoke"
 
@@ -98,86 +134,40 @@ def analyze_image(image_path):
 
             department = "Railway Safety"
 
-
-        elif "garbage" in label.lower():
-
-            issue = "Cleanliness Issue"
-
-            category = "Cleanliness"
-
-            severity = "MEDIUM"
-
-            safety_risk = False
-
-            department = "Housekeeping"
+            confidence = min(
+                0.70,
+                0.40 + fire_ratio
+            )
 
 
-        elif "water leakage" in label.lower():
+        # ----------------------------------------------------
+        # Very dark image
+        # ----------------------------------------------------
 
-            issue = "Water Leakage"
+        elif dark_ratio > 0.45:
 
-            category = "Maintenance"
+            label = "Very dark image - possible smoke or low visibility"
 
-            severity = "HIGH"
+            issue = "Low Visibility"
 
-            safety_risk = True
-
-            department = "Maintenance"
-
-
-        elif "damaged railway seat" in label.lower():
-
-            issue = "Damaged Interior"
-
-            category = "Maintenance"
+            category = "Safety"
 
             severity = "MEDIUM"
 
             safety_risk = False
 
-            department = "Carriage Maintenance"
+            department = "Railway Safety"
+
+            confidence = 0.45
 
 
-        elif "electrical" in label.lower():
+        # ----------------------------------------------------
+        # Predominantly gray image
+        # ----------------------------------------------------
 
-            issue = "Electrical Problem"
+        elif gray_ratio > 0.55:
 
-            category = "Electrical"
-
-            severity = "HIGH"
-
-            safety_risk = True
-
-            department = "Electrical Maintenance"
-
-
-        elif "crowded" in label.lower():
-
-            issue = "Overcrowding"
-
-            category = "Passenger Safety"
-
-            severity = "HIGH"
-
-            safety_risk = True
-
-            department = "Railway Operations"
-
-
-        elif "normal" in label.lower():
-
-            issue = "No Visible Issue"
-
-            category = "General"
-
-            severity = "LOW"
-
-            safety_risk = False
-
-            department = "General Helpdesk"
-
-
-        else:
+            label = "Railway interior / equipment image"
 
             issue = "Railway Equipment Problem"
 
@@ -189,10 +179,33 @@ def analyze_image(image_path):
 
             department = "Maintenance"
 
+            confidence = 0.40
 
-        # ----------------------------------
+
+        # ----------------------------------------------------
+        # Otherwise
+        # ----------------------------------------------------
+
+        else:
+
+            label = "Railway image received - manual review recommended"
+
+            issue = "Visual Inspection Required"
+
+            category = "General"
+
+            severity = "LOW"
+
+            safety_risk = False
+
+            department = "General Helpdesk"
+
+            confidence = 0.30
+
+
+        # ====================================================
         # RETURN RESULT
-        # ----------------------------------
+        # ====================================================
 
         return {
 
@@ -223,13 +236,13 @@ def analyze_image(image_path):
             error
         )
 
-
         return {
 
             "visual_label":
                 "Unable to analyze image",
 
-            "confidence": 0,
+            "confidence":
+                0,
 
             "issue":
                 "Vision Analysis Failed",
