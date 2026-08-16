@@ -5,6 +5,13 @@ import "./App.css";
 function App() {
 
   // ==========================================
+  // BACKEND API
+  // ==========================================
+
+  const API_URL = "https://railai-backend-l6lr.onrender.com";
+
+
+  // ==========================================
   // STATE
   // ==========================================
 
@@ -35,18 +42,13 @@ function App() {
     const file =
       event.target.files[0];
 
-
     if (!file) {
-
       return;
-
     }
-
 
     setSelectedImage(file);
 
     setResult(null);
-
   };
 
 
@@ -72,7 +74,6 @@ function App() {
       );
 
       return;
-
     }
 
 
@@ -82,7 +83,6 @@ function App() {
 
     const recognition =
       new SpeechRecognition();
-
 
     recognition.lang = "en-IN";
 
@@ -98,7 +98,6 @@ function App() {
     recognition.onstart = () => {
 
       setIsRecording(true);
-
     };
 
 
@@ -111,20 +110,16 @@ function App() {
       const spokenText =
         event.results[0][0].transcript;
 
-
       console.log(
         "Voice input:",
         spokenText
       );
 
-
       setComplaint(
         spokenText
       );
 
-
       setResult(null);
-
     };
 
 
@@ -139,9 +134,7 @@ function App() {
         event.error
       );
 
-
       setIsRecording(false);
-
 
       if (
         event.error ===
@@ -151,7 +144,6 @@ function App() {
         alert(
           "Microphone permission was denied. Please allow microphone access in Chrome."
         );
-
       }
 
       else {
@@ -159,9 +151,7 @@ function App() {
         alert(
           "Could not recognize your voice. Please try again."
         );
-
       }
-
     };
 
 
@@ -172,7 +162,6 @@ function App() {
     recognition.onend = () => {
 
       setIsRecording(false);
-
     };
 
 
@@ -181,7 +170,6 @@ function App() {
     // ----------------------------------------
 
     recognition.start();
-
   };
 
 
@@ -205,7 +193,6 @@ function App() {
       );
 
       return;
-
     }
 
 
@@ -248,7 +235,6 @@ function App() {
           "image",
           selectedImage
         );
-
       }
 
 
@@ -261,7 +247,6 @@ function App() {
         complaint.trim()
       );
 
-
       console.log(
         "Sending image:",
         selectedImage
@@ -271,22 +256,16 @@ function App() {
 
 
       // --------------------------------------
-      // SEND TO BACKEND
+      // SEND TO PUBLIC BACKEND
       // --------------------------------------
 
       const response =
         await fetch(
-
-          "http://127.0.0.1:8000/analyze",
-
+          `${API_URL}/analyze`,
           {
-
             method: "POST",
-
             body: formData
-
           }
-
         );
 
 
@@ -296,7 +275,6 @@ function App() {
 
       const data =
         await response.json();
-
 
       console.log(
         "Backend response:",
@@ -311,13 +289,10 @@ function App() {
       if (!response.ok) {
 
         throw new Error(
-
           `Server returned ${response.status}: ${
             JSON.stringify(data)
           }`
-
         );
-
       }
 
 
@@ -337,11 +312,10 @@ function App() {
         error
       );
 
-
       setResult({
 
         error:
-          "Could not analyze the complaint. Please check that the RailAI backend is running."
+          "Could not analyze the complaint. Please check the RailAI backend connection."
 
       });
 
@@ -351,7 +325,6 @@ function App() {
     finally {
 
       setLoading(false);
-
     }
 
   };
@@ -368,13 +341,10 @@ function App() {
       <div>
 
         <button
-
           className="back-to-passenger"
-
           onClick={() =>
             setPage("passenger")
           }
-
         >
 
           ← Passenger Portal
@@ -387,7 +357,6 @@ function App() {
       </div>
 
     );
-
   }
 
 
@@ -418,13 +387,10 @@ function App() {
 
 
           <button
-
             className="nav-active"
-
             onClick={() =>
               setPage("passenger")
             }
-
           >
 
             Passenger Portal
@@ -433,11 +399,9 @@ function App() {
 
 
           <button
-
             onClick={() =>
               setPage("officer")
             }
-
           >
 
             Officer Dashboard
@@ -1098,6 +1062,7 @@ function App() {
                   team.
 
                 </p>
+
 
               </div>
 
