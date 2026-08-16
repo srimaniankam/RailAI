@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import "./OfficerDashboard.css";
 
+const API_URL =
+  "https://railai-backend-l6lr.onrender.com";
+
 function OfficerDashboard() {
   const [complaints, setComplaints] = useState([]);
   const [incidents, setIncidents] = useState([]);
@@ -14,7 +17,7 @@ function OfficerDashboard() {
   const fetchComplaints = async () => {
     try {
       const response = await fetch(
-        "http://127.0.0.1:8000/complaints"
+        `${API_URL}/complaints`
       );
 
       if (!response.ok) {
@@ -41,7 +44,7 @@ function OfficerDashboard() {
   const fetchIncidents = async () => {
     try {
       const response = await fetch(
-        "http://127.0.0.1:8000/incidents"
+        `${API_URL}/incidents`
       );
 
       if (!response.ok) {
@@ -79,7 +82,7 @@ function OfficerDashboard() {
   ) => {
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/complaints/${complaintId}/status`,
+        `${API_URL}/complaints/${complaintId}/status`,
         {
           method: "PUT",
 
