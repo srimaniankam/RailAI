@@ -1,135 +1,348 @@
-from sentence_transformers import SentenceTransformer, util
+import re
 
 
-# ==========================================
-# LOAD NLP MODEL
-# ==========================================
+# ============================================================
+# RAILAI LIGHTWEIGHT NLP ENGINE
+# ============================================================
+# This version is designed for cloud deployment.
+# It does NOT load SentenceTransformer/PyTorch models.
+# ============================================================
 
-model = SentenceTransformer("all-MiniLM-L6-v2")
 
-
-# ==========================================
+# ============================================================
 # KNOWN COMPLAINT TYPES
-# ==========================================
+# ============================================================
 
 complaint_types = {
 
     "AC Failure": [
+        "air conditioner",
+        "air conditioning",
         "air conditioner is not working",
-        "AC stopped working",
-        "no cooling in the coach",
+        "ac not working",
+        "ac stopped working",
+        "ac failure",
+        "no cooling",
+        "no air conditioning",
+        "coach is hot",
         "coach is very hot",
-        "air conditioning has failed",
-        "AC is not functioning",
-        "there is no air conditioning"
+        "air conditioning failed",
+        "air conditioner stopped"
     ],
 
     "Toilet Problem": [
+        "toilet",
+        "bathroom",
+        "washroom",
         "toilet is dirty",
-        "toilet is not clean",
+        "toilet is blocked",
         "toilet is unusable",
         "bathroom is dirty",
         "washroom needs cleaning",
-        "toilet is blocked"
+        "toilet not clean"
     ],
 
     "Garbage Problem": [
+        "garbage",
+        "trash",
+        "waste",
+        "rubbish",
         "garbage is lying around",
-        "there is garbage in the coach",
-        "waste has not been collected",
-        "coach has trash",
-        "trash is everywhere"
+        "trash everywhere",
+        "waste not collected",
+        "garbage in coach",
+        "coach has trash"
     ],
 
     "Security Concern": [
-        "someone is behaving suspiciously",
-        "there is a security problem",
-        "someone is threatening passengers",
-        "there is a fight",
-        "someone is being harassed"
+        "security",
+        "suspicious",
+        "threat",
+        "threatening",
+        "fight",
+        "harassment",
+        "harassed",
+        "violence",
+        "someone is threatening",
+        "security problem",
+        "someone behaving suspiciously"
     ],
 
     "Theft": [
-        "my luggage was stolen",
-        "my phone was stolen",
-        "someone stole my belongings",
-        "my bag is missing",
-        "my wallet was stolen"
+        "stolen",
+        "steal",
+        "theft",
+        "robbed",
+        "robbery",
+        "luggage stolen",
+        "phone stolen",
+        "bag stolen",
+        "wallet stolen",
+        "belongings stolen",
+        "bag is missing",
+        "luggage missing"
     ],
 
     "Medical Emergency": [
-        "a passenger is unconscious",
-        "someone needs medical help",
-        "a passenger is injured",
-        "someone is bleeding",
-        "there is a medical emergency"
+        "medical",
+        "doctor",
+        "ambulance",
+        "unconscious",
+        "injured",
+        "injury",
+        "bleeding",
+        "blood",
+        "medical emergency",
+        "needs medical help",
+        "passenger is injured",
+        "passenger unconscious"
     ],
 
     "Electrical Problem": [
-        "electrical system is not working",
-        "lights are not working",
-        "power has gone out",
-        "electrical problem in the coach",
-        "coach lights have failed"
+        "electrical",
+        "electricity",
+        "power",
+        "light",
+        "lights",
+        "lights not working",
+        "power gone",
+        "power failure",
+        "electrical system",
+        "electrical problem",
+        "coach lights failed"
     ]
 }
 
 
-# ==========================================
-# CREATE EMBEDDINGS
-# ==========================================
+# ============================================================
+# KEYWORDS USED FOR CLASSIFICATION
+# ============================================================
 
-complaint_embeddings = {}
+issue_keywords = {
 
-for complaint_type, examples in complaint_types.items():
+    "AC Failure": [
+        "ac",
+        "air conditioner",
+        "air conditioning",
+        "cooling",
+        "hot coach",
+        "coach is hot",
+        "no cooling"
+    ],
 
-    complaint_embeddings[complaint_type] = model.encode(
-        examples,
-        convert_to_tensor=True
-    )
+    "Toilet Problem": [
+        "toilet",
+        "bathroom",
+        "washroom",
+        "restroom",
+        "urinal"
+    ],
+
+    "Garbage Problem": [
+        "garbage",
+        "trash",
+        "waste",
+        "rubbish",
+        "dirty coach",
+        "litter"
+    ],
+
+    "Security Concern": [
+        "security",
+        "suspicious",
+        "threat",
+        "threatening",
+        "fight",
+        "harassment",
+        "harassed",
+        "violence",
+        "attack"
+    ],
+
+    "Theft": [
+        "stolen",
+        "steal",
+        "theft",
+        "robbed",
+        "robbery",
+        "missing luggage",
+        "missing bag",
+        "missing phone",
+        "wallet stolen"
+    ],
+
+    "Medical Emergency": [
+        "medical",
+        "doctor",
+        "ambulance",
+        "unconscious",
+        "injured",
+        "injury",
+        "bleeding",
+        "blood",
+        "emergency",
+        "sick",
+        "fainted",
+        "fainting"
+    ],
+
+    "Electrical Problem": [
+        "electrical",
+        "electricity",
+        "power",
+        "light",
+        "lights",
+        "switch",
+        "socket",
+        "charging point"
+    ]
+}
 
 
-# ==========================================
+# ============================================================
+# EMERGENCY KEYWORDS
+# ============================================================
+
+emergency_words = [
+    "fire",
+    "smoke",
+    "bleeding",
+    "unconscious",
+    "explosion",
+    "accident",
+    "injured",
+    "injury",
+    "threat",
+    "weapon",
+    "attack",
+    "violence",
+    "fainted",
+    "fainting",
+    "medical emergency"
+]
+
+
+# ============================================================
+# TEXT NORMALIZATION
+# ============================================================
+
+def normalize_text(text):
+
+    if not text:
+        return ""
+
+    text = str(text).lower()
+
+    # Replace punctuation with spaces
+    text = re.sub(r"[^a-z0-9\s]", " ", text)
+
+    # Remove extra spaces
+    text = re.sub(r"\s+", " ", text).strip()
+
+    return text
+
+
+# ============================================================
 # CLASSIFY COMPLAINT
-# ==========================================
+# ============================================================
 
 def classify_complaint(text):
 
-    user_embedding = model.encode(
-        text,
-        convert_to_tensor=True
+    complaint = normalize_text(text)
+
+    if not complaint:
+        return {
+            "issue": "Other",
+            "confidence": 0.0
+        }
+
+    scores = {}
+
+    # --------------------------------------------------------
+    # Score each complaint category
+    # --------------------------------------------------------
+
+    for complaint_type, keywords in issue_keywords.items():
+
+        score = 0
+
+        for keyword in keywords:
+
+            keyword = normalize_text(keyword)
+
+            if not keyword:
+                continue
+
+            # Exact phrase match
+            if keyword in complaint:
+
+                # Longer phrases receive higher weight
+                words = len(keyword.split())
+
+                if words >= 3:
+                    score += 3
+                elif words == 2:
+                    score += 2
+                else:
+                    score += 1
+
+        scores[complaint_type] = score
+
+    # --------------------------------------------------------
+    # Find highest scoring category
+    # --------------------------------------------------------
+
+    best_type = max(
+        scores,
+        key=scores.get
     )
 
-    best_type = None
+    best_score = scores[best_type]
 
-    best_score = -1
+    # --------------------------------------------------------
+    # No matching category
+    # --------------------------------------------------------
 
-    for complaint_type, embeddings in complaint_embeddings.items():
+    if best_score == 0:
 
-        scores = util.cos_sim(
-            user_embedding,
-            embeddings
-        )
+        return {
+            "issue": "Other",
+            "confidence": 0.30
+        }
 
-        score = float(scores.max())
+    # --------------------------------------------------------
+    # Convert score to confidence
+    # --------------------------------------------------------
 
-        if score > best_score:
+    # Strong phrase/keyword matches receive higher confidence.
+    if best_score >= 6:
+        confidence = 0.95
 
-            best_score = score
+    elif best_score >= 4:
+        confidence = 0.90
 
-            best_type = complaint_type
+    elif best_score >= 3:
+        confidence = 0.85
+
+    elif best_score >= 2:
+        confidence = 0.75
+
+    else:
+        confidence = 0.65
 
     return {
         "issue": best_type,
-        "confidence": round(best_score, 3)
+        "confidence": round(confidence, 3)
     }
 
 
-# ==========================================
+# ============================================================
 # GET INCIDENT DETAILS
-# ==========================================
+# ============================================================
 
 def get_incident_details(issue, complaint):
+
+    complaint = normalize_text(complaint)
 
     category = "Other"
 
@@ -140,9 +353,9 @@ def get_incident_details(issue, complaint):
     department = "General Helpdesk"
 
 
-    # --------------------------------------
-    # AC / ELECTRICAL
-    # --------------------------------------
+    # ========================================================
+    # AC
+    # ========================================================
 
     if issue == "AC Failure":
 
@@ -153,6 +366,10 @@ def get_incident_details(issue, complaint):
         severity = "HIGH"
 
 
+    # ========================================================
+    # ELECTRICAL
+    # ========================================================
+
     elif issue == "Electrical Problem":
 
         category = "Electrical"
@@ -162,9 +379,9 @@ def get_incident_details(issue, complaint):
         severity = "HIGH"
 
 
-    # --------------------------------------
+    # ========================================================
     # TOILET
-    # --------------------------------------
+    # ========================================================
 
     elif issue == "Toilet Problem":
 
@@ -175,9 +392,9 @@ def get_incident_details(issue, complaint):
         severity = "MEDIUM"
 
 
-    # --------------------------------------
+    # ========================================================
     # GARBAGE
-    # --------------------------------------
+    # ========================================================
 
     elif issue == "Garbage Problem":
 
@@ -188,9 +405,9 @@ def get_incident_details(issue, complaint):
         severity = "MEDIUM"
 
 
-    # --------------------------------------
+    # ========================================================
     # SECURITY
-    # --------------------------------------
+    # ========================================================
 
     elif issue == "Security Concern":
 
@@ -203,9 +420,9 @@ def get_incident_details(issue, complaint):
         safety_risk = True
 
 
-    # --------------------------------------
+    # ========================================================
     # THEFT
-    # --------------------------------------
+    # ========================================================
 
     elif issue == "Theft":
 
@@ -218,9 +435,9 @@ def get_incident_details(issue, complaint):
         safety_risk = True
 
 
-    # --------------------------------------
+    # ========================================================
     # MEDICAL
-    # --------------------------------------
+    # ========================================================
 
     elif issue == "Medical Emergency":
 
@@ -233,28 +450,65 @@ def get_incident_details(issue, complaint):
         safety_risk = True
 
 
-    # --------------------------------------
+    # ========================================================
     # EMERGENCY OVERRIDE
-    # --------------------------------------
+    # ========================================================
 
-    emergency_words = [
-        "fire",
-        "smoke",
-        "bleeding",
-        "unconscious",
-        "explosion",
-        "accident",
-        "injured",
-        "threat",
-        "weapon"
-    ]
+    for word in emergency_words:
 
-    if any(word in complaint for word in emergency_words):
+        if word in complaint:
 
-        severity = "CRITICAL"
+            severity = "CRITICAL"
 
-        safety_risk = True
+            safety_risk = True
 
+            # If the complaint was not already categorized,
+            # route emergency complaints appropriately.
+
+            if issue == "Other":
+
+                if any(
+                    x in complaint
+                    for x in [
+                        "medical",
+                        "bleeding",
+                        "unconscious",
+                        "injured",
+                        "ambulance",
+                        "fainted",
+                        "fainting"
+                    ]
+                ):
+
+                    category = "Medical"
+
+                    department = "Medical Unit"
+
+                elif any(
+                    x in complaint
+                    for x in [
+                        "fire",
+                        "smoke",
+                        "explosion"
+                    ]
+                ):
+
+                    category = "Emergency"
+
+                    department = "Emergency Response"
+
+                else:
+
+                    category = "Security"
+
+                    department = "Railway Security"
+
+            break
+
+
+    # ========================================================
+    # RETURN INCIDENT DETAILS
+    # ========================================================
 
     return {
         "category": category,
