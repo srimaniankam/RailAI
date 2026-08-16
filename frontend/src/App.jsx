@@ -2,14 +2,10 @@ import { useState } from "react";
 import OfficerDashboard from "./OfficerDashboard";
 import "./App.css";
 
+const API_URL =
+  "https://railai-backend-l6lr.onrender.com";
+
 function App() {
-
-  // ==========================================
-  // BACKEND API
-  // ==========================================
-
-  const API_URL = "https://railai-backend-l6lr.onrender.com";
-
 
   // ==========================================
   // STATE
@@ -17,7 +13,16 @@ function App() {
 
   const [complaint, setComplaint] = useState("");
 
+  const [trainNumber, setTrainNumber] =
+    useState("");
+
+  const [coachNumber, setCoachNumber] =
+    useState("");
+
   const [selectedImage, setSelectedImage] =
+    useState(null);
+
+  const [trackingComplaint, setTrackingComplaint] =
     useState(null);
 
   const [result, setResult] =
@@ -42,13 +47,18 @@ function App() {
     const file =
       event.target.files[0];
 
+
     if (!file) {
+
       return;
+
     }
+
 
     setSelectedImage(file);
 
     setResult(null);
+
   };
 
 
@@ -74,6 +84,7 @@ function App() {
       );
 
       return;
+
     }
 
 
@@ -83,6 +94,7 @@ function App() {
 
     const recognition =
       new SpeechRecognition();
+
 
     recognition.lang = "en-IN";
 
@@ -98,6 +110,7 @@ function App() {
     recognition.onstart = () => {
 
       setIsRecording(true);
+
     };
 
 
@@ -110,16 +123,20 @@ function App() {
       const spokenText =
         event.results[0][0].transcript;
 
+
       console.log(
         "Voice input:",
         spokenText
       );
 
+
       setComplaint(
         spokenText
       );
 
+
       setResult(null);
+
     };
 
 
@@ -134,7 +151,9 @@ function App() {
         event.error
       );
 
+
       setIsRecording(false);
+
 
       if (
         event.error ===
@@ -144,6 +163,7 @@ function App() {
         alert(
           "Microphone permission was denied. Please allow microphone access in Chrome."
         );
+
       }
 
       else {
@@ -151,7 +171,9 @@ function App() {
         alert(
           "Could not recognize your voice. Please try again."
         );
+
       }
+
     };
 
 
@@ -162,6 +184,7 @@ function App() {
     recognition.onend = () => {
 
       setIsRecording(false);
+
     };
 
 
@@ -170,6 +193,7 @@ function App() {
     // ----------------------------------------
 
     recognition.start();
+
   };
 
 
@@ -193,6 +217,7 @@ function App() {
       );
 
       return;
+
     }
 
 
@@ -224,6 +249,16 @@ function App() {
         complaint.trim()
       );
 
+      formData.append(
+        "train_number",
+        trainNumber.trim()
+      );
+
+      formData.append(
+        "coach",
+        coachNumber.trim()
+      );
+
 
       // --------------------------------------
       // ADD IMAGE
@@ -235,6 +270,7 @@ function App() {
           "image",
           selectedImage
         );
+
       }
 
 
@@ -247,6 +283,7 @@ function App() {
         complaint.trim()
       );
 
+
       console.log(
         "Sending image:",
         selectedImage
@@ -256,16 +293,22 @@ function App() {
 
 
       // --------------------------------------
-      // SEND TO PUBLIC BACKEND
+      // SEND TO BACKEND
       // --------------------------------------
 
       const response =
         await fetch(
+
           `${API_URL}/analyze`,
+
           {
+
             method: "POST",
+
             body: formData
+
           }
+
         );
 
 
@@ -275,6 +318,7 @@ function App() {
 
       const data =
         await response.json();
+
 
       console.log(
         "Backend response:",
@@ -289,10 +333,13 @@ function App() {
       if (!response.ok) {
 
         throw new Error(
+
           `Server returned ${response.status}: ${
             JSON.stringify(data)
           }`
+
         );
+
       }
 
 
@@ -312,10 +359,11 @@ function App() {
         error
       );
 
+
       setResult({
 
         error:
-          "Could not analyze the complaint. Please check the RailAI backend connection."
+          "Could not analyze the complaint. Please check that the RailAI backend is running."
 
       });
 
@@ -325,9 +373,75 @@ function App() {
     finally {
 
       setLoading(false);
+
     }
 
   };
+
+
+  // ==========================================
+  // TRACK SPECIFIC COMPLAINT
+  // ==========================================
+
+  useEffect(() => {
+    if (!trackingComplaint?.id) {
+      return;
+    }
+
+    const fetchComplaintStatus = async () => {
+      try {
+        const response = await fetch(
+          `${API_URL}/complaints`
+        );
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data = await response.json();
+
+        const currentComplaint = data.find(
+          item =>
+            Number(item.id) ===
+            Number(trackingComplaint.id)
+        );
+
+        if (currentComplaint) {
+          setTrackingComplaint({
+            id: currentComplaint.id,
+            status:
+              currentComplaint.status ||
+              "Pending",
+            train_number:
+              currentComplaint.train_number ||
+              trainNumber,
+            coach:
+              currentComplaint.coach ||
+              coachNumber,
+            department:
+              currentComplaint.department ||
+              "General Helpdesk"
+          });
+        }
+      } catch (error) {
+        console.error(
+          "Status tracking error:",
+          error
+        );
+      }
+    };
+
+    fetchComplaintStatus();
+
+    const interval = setInterval(
+      fetchComplaintStatus,
+      5000
+    );
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [trackingComplaint?.id]);
 
 
   // ==========================================
@@ -341,10 +455,13 @@ function App() {
       <div>
 
         <button
+
           className="back-to-passenger"
+
           onClick={() =>
             setPage("passenger")
           }
+
         >
 
           ← Passenger Portal
@@ -357,6 +474,7 @@ function App() {
       </div>
 
     );
+
   }
 
 
@@ -387,10 +505,13 @@ function App() {
 
 
           <button
+
             className="nav-active"
+
             onClick={() =>
               setPage("passenger")
             }
+
           >
 
             Passenger Portal
@@ -399,9 +520,11 @@ function App() {
 
 
           <button
+
             onClick={() =>
               setPage("officer")
             }
+
           >
 
             Officer Dashboard
@@ -635,6 +758,105 @@ function App() {
 
         </section>
 
+
+        {/* ====================================
+            COMPLAINT STATUS TRACKING
+        ==================================== */}
+
+        {trackingComplaint && (
+          <section className="tracking-card">
+            <div className="tracking-header">
+              <div>
+                <span className="tracking-label">
+                  Complaint Tracking
+                </span>
+                <h2>
+                  Complaint #{trackingComplaint.id}
+                </h2>
+              </div>
+
+              <strong className="tracking-current-status">
+                {trackingComplaint.status}
+              </strong>
+            </div>
+
+            <div className="tracking-details">
+              <div>
+                <span>Train</span>
+                <strong>
+                  {trackingComplaint.train_number || "Not available"}
+                </strong>
+              </div>
+
+              <div>
+                <span>Coach</span>
+                <strong>
+                  {trackingComplaint.coach || "Not available"}
+                </strong>
+              </div>
+
+              <div>
+                <span>Department</span>
+                <strong>
+                  {trackingComplaint.department || "General Helpdesk"}
+                </strong>
+              </div>
+            </div>
+
+            <div className="status-timeline">
+              {[
+                "Pending",
+                "Assigned",
+                "In Progress",
+                "Resolved"
+              ].map((status, index) => {
+                const order = {
+                  Pending: 1,
+                  Assigned: 2,
+                  "In Progress": 3,
+                  Resolved: 4
+                };
+
+                const currentOrder =
+                  order[trackingComplaint.status] || 1;
+
+                const statusOrder = order[status];
+                const completed =
+                  statusOrder <= currentOrder;
+
+                return (
+                  <div
+                    className={`status-step ${
+                      completed ? "status-completed" : ""
+                    }`}
+                    key={status}
+                  >
+                    <div className="status-dot">
+                      {completed ? "✓" : ""}
+                    </div>
+
+                    <span>{status}</span>
+
+                    {index < 3 && (
+                      <div
+                        className={`status-line ${
+                          statusOrder < currentOrder
+                            ? "status-line-completed"
+                            : ""
+                        }`}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <p className="tracking-note">
+              Status updates automatically when an officer
+              changes your complaint status.
+            </p>
+          </section>
+        )}
 
         {/* ====================================
             ERROR
@@ -1062,7 +1284,6 @@ function App() {
                   team.
 
                 </p>
-
 
               </div>
 
