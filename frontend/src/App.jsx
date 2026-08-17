@@ -1,19 +1,48 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import OfficerDashboard from "./OfficerDashboard";
 import "./App.css";
+import "./StatusTracker.css";
+
+
+// =========================================================
+// BACKEND URL
+// =========================================================
+
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  (
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1"
+      ? "http://127.0.0.1:8000"
+      : "https://railai-backend-l6lr.onrender.com"
+  );
+
+
+// =========================================================
+// STATUS STEPS
+// =========================================================
+
+const STATUS_STEPS = [
+  "Pending",
+  "Assigned",
+  "In Progress",
+  "Resolved"
+];
+
 
 function App() {
 
-  // ==========================================
-  // STATE
-  // ==========================================
+  // =======================================================
+  // BASIC STATE
+  // =======================================================
 
-  const [complaint, setComplaint] = useState("");
+  const [complaint, setComplaint] =
+    useState("");
 
   const [trainNumber, setTrainNumber] =
     useState("");
 
-  const [coachNumber, setCoachNumber] =
+  const [coach, setCoach] =
     useState("");
 
   const [selectedImage, setSelectedImage] =
@@ -32,22 +61,38 @@ function App() {
     useState("passenger");
 
 
-  // ==========================================
+  // =======================================================
+  // COMPLAINT TRACKING STATE
+  // =======================================================
+
+  const [complaintId, setComplaintId] =
+    useState(null);
+
+  const [trackedComplaint, setTrackedComplaint] =
+    useState(null);
+
+  const [trackingId, setTrackingId] =
+    useState("");
+
+  const [trackingLoading, setTrackingLoading] =
+    useState(false);
+
+  const [trackingError, setTrackingError] =
+    useState("");
+
+
+  // =======================================================
   // IMAGE SELECT
-  // ==========================================
+  // =======================================================
 
   const handleImageChange = (event) => {
 
     const file =
       event.target.files[0];
 
-
     if (!file) {
-
       return;
-
     }
-
 
     setSelectedImage(file);
 
@@ -56,9 +101,9 @@ function App() {
   };
 
 
-  // ==========================================
+  // =======================================================
   // VOICE RECOGNITION
-  // ==========================================
+  // =======================================================
 
   const startVoiceRecording = () => {
 
@@ -67,10 +112,6 @@ function App() {
       window.webkitSpeechRecognition;
 
 
-    // ----------------------------------------
-    // CHECK BROWSER SUPPORT
-    // ----------------------------------------
-
     if (!SpeechRecognition) {
 
       alert(
@@ -78,13 +119,8 @@ function App() {
       );
 
       return;
-
     }
 
-
-    // ----------------------------------------
-    // CREATE RECOGNITION
-    // ----------------------------------------
 
     const recognition =
       new SpeechRecognition();
@@ -97,10 +133,6 @@ function App() {
     recognition.interimResults = false;
 
 
-    // ----------------------------------------
-    // START
-    // ----------------------------------------
-
     recognition.onstart = () => {
 
       setIsRecording(true);
@@ -108,35 +140,20 @@ function App() {
     };
 
 
-    // ----------------------------------------
-    // RESULT
-    // ----------------------------------------
-
     recognition.onresult = (event) => {
 
       const spokenText =
         event.results[0][0].transcript;
 
 
-      console.log(
-        "Voice input:",
-        spokenText
-      );
-
-
       setComplaint(
         spokenText
       );
-
 
       setResult(null);
 
     };
 
-
-    // ----------------------------------------
-    // ERROR
-    // ----------------------------------------
 
     recognition.onerror = (event) => {
 
@@ -158,9 +175,7 @@ function App() {
           "Microphone permission was denied. Please allow microphone access in Chrome."
         );
 
-      }
-
-      else {
+      } else {
 
         alert(
           "Could not recognize your voice. Please try again."
@@ -171,10 +186,6 @@ function App() {
     };
 
 
-    // ----------------------------------------
-    // END
-    // ----------------------------------------
-
     recognition.onend = () => {
 
       setIsRecording(false);
@@ -182,24 +193,166 @@ function App() {
     };
 
 
-    // ----------------------------------------
-    // START RECORDING
-    // ----------------------------------------
-
     recognition.start();
 
   };
 
 
-  // ==========================================
+  // =======================================================
+  // GET SPECIFIC COMPLAINT
+  // =======================================================
+
+  const fetchComplaintStatus = async (
+    id,
+    showLoading = false
+  ) => {
+
+    if (!id) {
+      return;
+    }
+
+
+    if (showLoading) {
+      setTrackingLoading(true);
+    }
+
+
+    try {
+
+      const response =
+        await fetch(
+          `${API_BASE_URL}/complaints/${id}`
+        );
+
+
+      const data =
+        await response.json();
+
+
+      if (!response.ok) {
+
+        throw new Error(
+          data.detail ||
+          data.message ||
+          "Complaint not found."
+        );
+
+      }
+
+
+      setTrackedComplaint(data);
+
+      setTrackingError("");
+
+    }
+
+    catch (error) {
+
+      console.error(
+        "Tracking error:",
+        error
+      );
+
+      setTrackingError(
+        error.message ||
+        "Unable to find this complaint."
+      );
+
+    }
+
+    finally {
+
+      if (showLoading) {
+        setTrackingLoading(false);
+      }
+
+    }
+
+  };
+
+
+  // =======================================================
+  // AUTOMATIC STATUS REFRESH
+  // =======================================================
+
+  useEffect(() => {
+
+    if (!complaintId) {
+      return;
+    }
+
+
+    fetchComplaintStatus(
+      complaintId
+    );
+
+
+    const interval =
+      setInterval(
+        () => {
+
+          fetchComplaintStatus(
+            complaintId
+          );
+
+        },
+        5000
+      );
+
+
+    return () => {
+
+      clearInterval(
+        interval
+      );
+
+    };
+
+  }, [complaintId]);
+
+
+  // =======================================================
+  // TRACK COMPLAINT BUTTON
+  // =======================================================
+
+  const trackComplaint = async () => {
+
+    const cleanId =
+      trackingId.trim();
+
+
+    if (!cleanId) {
+
+      alert(
+        "Please enter your complaint ID."
+      );
+
+      return;
+    }
+
+
+    setTrackingError("");
+
+    setTrackedComplaint(null);
+
+
+    await fetchComplaintStatus(
+      cleanId,
+      true
+    );
+
+  };
+
+
+  // =======================================================
   // ANALYZE COMPLAINT
-  // ==========================================
+  // =======================================================
 
   const analyzeComplaint = async () => {
 
-    // ----------------------------------------
+    // -------------------------------------------------------
     // CHECK INPUT
-    // ----------------------------------------
+    // -------------------------------------------------------
 
     if (
       !complaint.trim() &&
@@ -211,52 +364,87 @@ function App() {
       );
 
       return;
-
     }
 
 
-    // ----------------------------------------
+    if (!trainNumber.trim()) {
+
+      alert(
+        "Please enter the train number."
+      );
+
+      return;
+    }
+
+
+    if (!coach.trim()) {
+
+      alert(
+        "Please enter the coach number."
+      );
+
+      return;
+    }
+
+
+    // -------------------------------------------------------
     // START LOADING
-    // ----------------------------------------
+    // -------------------------------------------------------
 
     setLoading(true);
 
     setResult(null);
 
+    setComplaintId(null);
+
+    setTrackedComplaint(null);
+
+    setTrackingError("");
+
 
     try {
 
-      // --------------------------------------
+      // -----------------------------------------------------
       // CREATE FORM DATA
-      // --------------------------------------
+      // -----------------------------------------------------
 
       const formData =
         new FormData();
 
 
-      // --------------------------------------
-      // ADD COMPLAINT
-      // --------------------------------------
+      // -----------------------------------------------------
+      // COMPLAINT
+      // -----------------------------------------------------
 
       formData.append(
         "complaint",
         complaint.trim()
       );
 
+
+      // -----------------------------------------------------
+      // TRAIN NUMBER
+      // -----------------------------------------------------
+
       formData.append(
         "train_number",
         trainNumber.trim()
       );
 
+
+      // -----------------------------------------------------
+      // COACH
+      // -----------------------------------------------------
+
       formData.append(
         "coach",
-        coachNumber.trim()
+        coach.trim()
       );
 
 
-      // --------------------------------------
-      // ADD IMAGE
-      // --------------------------------------
+      // -----------------------------------------------------
+      // IMAGE
+      // -----------------------------------------------------
 
       if (selectedImage) {
 
@@ -268,47 +456,46 @@ function App() {
       }
 
 
-      // --------------------------------------
-      // DEBUG
-      // --------------------------------------
-
       console.log(
         "Sending complaint:",
         complaint.trim()
       );
 
+      console.log(
+        "Train number:",
+        trainNumber.trim()
+      );
 
       console.log(
-        "Sending image:",
+        "Coach:",
+        coach.trim()
+      );
+
+      console.log(
+        "Image:",
         selectedImage
           ? selectedImage.name
           : "No image"
       );
 
 
-      // --------------------------------------
+      // -----------------------------------------------------
       // SEND TO BACKEND
-      // --------------------------------------
+      // -----------------------------------------------------
 
       const response =
         await fetch(
-
-          "http://127.0.0.1:8000/analyze",
-
+          `${API_BASE_URL}/analyze`,
           {
-
             method: "POST",
-
             body: formData
-
           }
-
         );
 
 
-      // --------------------------------------
+      // -----------------------------------------------------
       // READ RESPONSE
-      // --------------------------------------
+      // -----------------------------------------------------
 
       const data =
         await response.json();
@@ -320,31 +507,55 @@ function App() {
       );
 
 
-      // --------------------------------------
+      // -----------------------------------------------------
       // SERVER ERROR
-      // --------------------------------------
+      // -----------------------------------------------------
 
       if (!response.ok) {
 
         throw new Error(
-
           `Server returned ${response.status}: ${
             JSON.stringify(data)
           }`
-
         );
 
       }
 
 
-      // --------------------------------------
+      // -----------------------------------------------------
       // SHOW RESULT
-      // --------------------------------------
+      // -----------------------------------------------------
 
       setResult(data);
 
-    }
 
+      // -----------------------------------------------------
+      // GET COMPLAINT ID
+      // -----------------------------------------------------
+
+      const newComplaintId =
+        data.complaint_id ||
+        data.id;
+
+
+      if (newComplaintId) {
+
+        setComplaintId(
+          newComplaintId
+        );
+
+        setTrackingId(
+          String(newComplaintId)
+        );
+
+        fetchComplaintStatus(
+          newComplaintId
+        );
+
+      }
+
+
+    }
 
     catch (error) {
 
@@ -363,7 +574,6 @@ function App() {
 
     }
 
-
     finally {
 
       setLoading(false);
@@ -373,9 +583,250 @@ function App() {
   };
 
 
-  // ==========================================
+  // =======================================================
+  // GET STATUS INDEX
+  // =======================================================
+
+  const getStatusIndex = (status) => {
+
+    const index =
+      STATUS_STEPS.indexOf(
+        status
+      );
+
+    return index >= 0
+      ? index
+      : 0;
+
+  };
+
+
+  // =======================================================
+  // STATUS TRACKER COMPONENT
+  // =======================================================
+
+  const StatusTracker = ({
+    complaintData
+  }) => {
+
+    if (!complaintData) {
+      return null;
+    }
+
+
+    const currentStatus =
+      complaintData.status ||
+      "Pending";
+
+
+    const currentIndex =
+      getStatusIndex(
+        currentStatus
+      );
+
+
+    return (
+
+      <section
+        className="status-tracker-card"
+      >
+
+        {/* ==============================================
+            HEADER
+        ============================================== */}
+
+        <div className="status-tracker-header">
+
+          <div>
+
+            <span className="status-tracker-label">
+              COMPLAINT TRACKING
+            </span>
+
+            <h2>
+              Complaint #{complaintData.id}
+            </h2>
+
+          </div>
+
+
+          <span
+            className={
+              `current-status-badge ${
+                currentStatus
+                  .toLowerCase()
+                  .replaceAll(" ", "-")
+              }`
+            }
+          >
+            {currentStatus}
+          </span>
+
+        </div>
+
+
+        {/* ==============================================
+            DETAILS
+        ============================================== */}
+
+        <div className="tracking-details">
+
+          <div>
+
+            <span>
+              Train Number
+            </span>
+
+            <strong>
+              {complaintData.train_number ||
+                trainNumber ||
+                "Not available"}
+            </strong>
+
+          </div>
+
+
+          <div>
+
+            <span>
+              Coach
+            </span>
+
+            <strong>
+              {complaintData.coach ||
+                coach ||
+                "Not available"}
+            </strong>
+
+          </div>
+
+
+          <div>
+
+            <span>
+              Issue
+            </span>
+
+            <strong>
+              {complaintData.issue ||
+                "Complaint"}
+            </strong>
+
+          </div>
+
+        </div>
+
+
+        {/* ==============================================
+            PROGRESS TRACKER
+        ============================================== */}
+
+        <div className="status-progress">
+
+          {STATUS_STEPS.map(
+            (step, index) => {
+
+              const completed =
+                index <= currentIndex;
+
+              const active =
+                index === currentIndex;
+
+
+              return (
+
+                <div
+                  className="status-step-wrapper"
+                  key={step}
+                >
+
+                  <div
+                    className={
+                      `status-step ${
+                        completed
+                          ? "completed"
+                          : ""
+                      } ${
+                        active
+                          ? "active"
+                          : ""
+                      }`
+                    }
+                  >
+
+                    <div className="status-circle">
+
+                      {completed
+                        ? "✓"
+                        : index + 1}
+
+                    </div>
+
+
+                    <span>
+                      {step}
+                    </span>
+
+                  </div>
+
+
+                  {index <
+                    STATUS_STEPS.length - 1 && (
+
+                    <div
+                      className={
+                        `status-line ${
+                          index <
+                          currentIndex
+                            ? "completed"
+                            : ""
+                        }`
+                      }
+                    />
+
+                  )}
+
+                </div>
+
+              );
+
+            }
+          )}
+
+        </div>
+
+
+        {/* ==============================================
+            CURRENT STATUS
+        ============================================== */}
+
+        <div className="status-message">
+
+          <strong>
+            Current Status:
+          </strong>
+
+          <span>
+            {currentStatus}
+          </span>
+
+        </div>
+
+
+        <p className="status-refresh-text">
+          Status updates automatically every 5 seconds.
+        </p>
+
+      </section>
+
+    );
+
+  };
+
+
+  // =======================================================
   // OFFICER DASHBOARD
-  // ==========================================
+  // =======================================================
 
   if (page === "officer") {
 
@@ -384,13 +835,10 @@ function App() {
       <div>
 
         <button
-
           className="back-to-passenger"
-
           onClick={() =>
             setPage("passenger")
           }
-
         >
 
           ← Passenger Portal
@@ -407,75 +855,61 @@ function App() {
   }
 
 
-  // ==========================================
+  // =======================================================
   // PASSENGER PORTAL
-  // ==========================================
+  // =======================================================
 
   return (
 
     <div className="app">
 
 
-      {/* ======================================
+      {/* =================================================
           NAVIGATION
-      ====================================== */}
+      ================================================= */}
 
       <div className="top-navigation">
 
-
         <div className="brand">
-
           🚆 RailAI
-
         </div>
 
 
         <div className="navigation-buttons">
 
-
           <button
-
             className="nav-active"
-
             onClick={() =>
               setPage("passenger")
             }
-
           >
-
             Passenger Portal
-
           </button>
 
 
           <button
-
             onClick={() =>
               setPage("officer")
             }
-
           >
-
             Officer Dashboard
-
           </button>
-
 
         </div>
 
       </div>
 
 
-      {/* ======================================
+      {/* =================================================
           MAIN
-      ====================================== */}
+      ================================================= */}
 
       <main>
 
 
-        {/* ====================================
+        {/* =================================================
             HERO
-        ==================================== */}
+        ================================================= */}
 
         <section className="hero">
 
@@ -502,98 +936,77 @@ function App() {
         </section>
 
 
-        {/* ====================================
+        {/* =================================================
             COMPLAINT CARD
-        ==================================== */}
+        ================================================= */}
 
         <section className="complaint-card">
 
 
-          {/* ==================================
-              TRAIN & COACH DETAILS
-          ================================== */}
+          {/* =================================================
+              TRAIN + COACH
+          ================================================= */}
 
-          <div
-            className="journey-details"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "12px",
-              marginBottom: "14px"
-            }}
-          >
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  fontWeight: "600",
-                  marginBottom: "6px"
-                }}
-              >
+          <div className="journey-details">
+
+
+            {/* TRAIN */}
+
+            <div className="journey-field">
+
+              <label>
                 Train Number
               </label>
 
               <input
                 type="text"
-                inputMode="numeric"
                 placeholder="e.g. 12727"
                 value={trainNumber}
                 onChange={(event) => {
+
                   setTrainNumber(
                     event.target.value
                   );
+
                   setResult(null);
-                }}
-                style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  padding: "12px",
-                  border: "1px solid #d9deea",
-                  borderRadius: "10px",
-                  fontSize: "15px",
-                  outline: "none"
+
                 }}
               />
+
             </div>
 
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  fontWeight: "600",
-                  marginBottom: "6px"
-                }}
-              >
+
+            {/* COACH */}
+
+            <div className="journey-field">
+
+              <label>
                 Coach Number
               </label>
 
               <input
                 type="text"
                 placeholder="e.g. B2"
-                value={coachNumber}
+                value={coach}
                 onChange={(event) => {
-                  setCoachNumber(
+
+                  setCoach(
                     event.target.value
                   );
+
                   setResult(null);
-                }}
-                style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  padding: "12px",
-                  border: "1px solid #d9deea",
-                  borderRadius: "10px",
-                  fontSize: "15px",
-                  outline: "none"
+
                 }}
               />
+
             </div>
+
           </div>
 
 
-          {/* ==================================
+          {/* =================================================
               TEXT INPUT
-          ================================== */}
+          ================================================= */}
 
           <textarea
 
@@ -614,9 +1027,9 @@ function App() {
           />
 
 
-          {/* ==================================
+          {/* =================================================
               INPUT OPTIONS
-          ================================== */}
+          ================================================= */}
 
           <div className="input-options">
 
@@ -677,21 +1090,18 @@ function App() {
           </div>
 
 
-          {/* ==================================
+          {/* =================================================
               SELECTED IMAGE
-          ================================== */}
+          ================================================= */}
 
           {selectedImage && (
 
             <div className="selected-image">
 
-
               <span>
 
                 📷 Selected:
-
                 {" "}
-
                 {selectedImage.name}
 
               </span>
@@ -715,15 +1125,14 @@ function App() {
 
               </button>
 
-
             </div>
 
           )}
 
 
-          {/* ==================================
+          {/* =================================================
               VOICE STATUS
-          ================================== */}
+          ================================================= */}
 
           {isRecording && (
 
@@ -740,9 +1149,9 @@ function App() {
           )}
 
 
-          {/* ==================================
+          {/* =================================================
               ANALYZE BUTTON
-          ================================== */}
+          ================================================= */}
 
           <button
 
@@ -770,9 +1179,9 @@ function App() {
         </section>
 
 
-        {/* ====================================
+        {/* =================================================
             ERROR
-        ==================================== */}
+        ================================================= */}
 
         {result?.error && (
 
@@ -781,7 +1190,6 @@ function App() {
             <h2>
               Analysis Error
             </h2>
-
 
             <p>
               {result.error}
@@ -792,9 +1200,9 @@ function App() {
         )}
 
 
-        {/* ====================================
-            RESULT
-        ==================================== */}
+        {/* =================================================
+            AI RESULT
+        ================================================= */}
 
         {result &&
           !result.error && (
@@ -813,31 +1221,49 @@ function App() {
                 <div
                   className="result-icon"
                 >
-
                   🤖
-
                 </div>
 
 
                 <div>
 
                   <h2>
-
                     AI Analysis Result
-
                   </h2>
 
-
                   <p>
-
                     Multimodal AI analysis
                     completed
-
                   </p>
 
                 </div>
 
               </div>
+
+
+              {/* =================================================
+                  COMPLAINT ID
+              ================================================= */}
+
+              {complaintId && (
+
+                <div className="complaint-id-box">
+
+                  <span>
+                    Complaint ID
+                  </span>
+
+                  <strong>
+                    #{complaintId}
+                  </strong>
+
+                  <p>
+                    Save this ID to track your complaint.
+                  </p>
+
+                </div>
+
+              )}
 
 
               {/* RESULT GRID */}
@@ -857,12 +1283,9 @@ function App() {
                     Category
                   </span>
 
-
                   <strong>
-
                     {result.category ||
                       "Not detected"}
-
                   </strong>
 
                 </div>
@@ -878,12 +1301,9 @@ function App() {
                     Issue
                   </span>
 
-
                   <strong>
-
                     {result.issue ||
                       "Not detected"}
-
                   </strong>
 
                 </div>
@@ -899,12 +1319,10 @@ function App() {
                     Train Number
                   </span>
 
-
                   <strong>
-
                     {result.train_number ||
+                      trainNumber ||
                       "Not detected"}
-
                   </strong>
 
                 </div>
@@ -920,12 +1338,10 @@ function App() {
                     Coach
                   </span>
 
-
                   <strong>
-
                     {result.coach ||
+                      coach ||
                       "Not detected"}
-
                   </strong>
 
                 </div>
@@ -941,12 +1357,9 @@ function App() {
                     Location
                   </span>
 
-
                   <strong>
-
                     {result.location ||
                       "Not detected"}
-
                   </strong>
 
                 </div>
@@ -961,7 +1374,6 @@ function App() {
                   <span>
                     Severity
                   </span>
-
 
                   <strong
 
@@ -1006,7 +1418,6 @@ function App() {
                     Safety Risk
                   </span>
 
-
                   <strong>
 
                     {result.safety_risk
@@ -1030,7 +1441,6 @@ function App() {
                     Department
                   </span>
 
-
                   <strong>
 
                     {result.department ||
@@ -1050,7 +1460,6 @@ function App() {
                   <span>
                     AI Confidence
                   </span>
-
 
                   <strong>
 
@@ -1078,7 +1487,6 @@ function App() {
                   <span>
                     Routing Decision
                   </span>
-
 
                   <strong
 
@@ -1110,9 +1518,9 @@ function App() {
               </div>
 
 
-              {/* =================================
+              {/* =================================================
                   COMPUTER VISION
-              ================================= */}
+              ================================================= */}
 
               {result.vision && (
 
@@ -1120,19 +1528,15 @@ function App() {
                   className="vision-result"
                 >
 
-
                   <div>
 
                     <span>
                       📸 Computer Vision
                     </span>
 
-
                     <strong>
-
                       {result.vision.issue ||
                         "No visible issue detected"}
-
                     </strong>
 
                   </div>
@@ -1143,7 +1547,6 @@ function App() {
                     <span>
                       Visual Evidence
                     </span>
-
 
                     <strong>
 
@@ -1161,15 +1564,14 @@ function App() {
 
                   </div>
 
-
                 </div>
 
               )}
 
 
-              {/* =================================
+              {/* =================================================
                   RECOMMENDATION
-              ================================= */}
+              ================================================= */}
 
               <div
                 className="recommendation"
@@ -1179,18 +1581,14 @@ function App() {
                   Recommended Action
                 </span>
 
-
                 <p>
 
                   This complaint has been
                   analyzed and routed to the{" "}
 
-
                   <strong>
-
                     {result.department ||
                       "appropriate"}
-
                   </strong>{" "}
 
                   team.
@@ -1200,15 +1598,118 @@ function App() {
               </div>
 
 
+              {/* =================================================
+                  LIVE STATUS
+              ================================================= */}
+
+              {trackedComplaint && (
+
+                <StatusTracker
+                  complaintData={
+                    trackedComplaint
+                  }
+                />
+
+              )}
+
             </section>
 
           )}
+
+
+        {/* =================================================
+            TRACK EXISTING COMPLAINT
+        ================================================= */}
+
+        <section
+          className="track-complaint-card"
+        >
+
+          <div>
+
+            <span className="status-tracker-label">
+              EXISTING COMPLAINT
+            </span>
+
+            <h2>
+              Track Your Complaint
+            </h2>
+
+            <p>
+              Enter your complaint ID to check its
+              latest status.
+            </p>
+
+          </div>
+
+
+          <div className="track-input-row">
+
+            <input
+              type="text"
+              placeholder="Enter complaint ID"
+              value={trackingId}
+              onChange={(event) => {
+
+                setTrackingId(
+                  event.target.value
+                );
+
+                setTrackingError("");
+
+              }}
+            />
+
+
+            <button
+              type="button"
+              onClick={
+                trackComplaint
+              }
+              disabled={
+                trackingLoading
+              }
+            >
+
+              {trackingLoading
+                ? "Checking..."
+                : "Track Complaint"}
+
+            </button>
+
+          </div>
+
+
+          {trackingError && (
+
+            <div className="tracking-error">
+
+              {trackingError}
+
+            </div>
+
+          )}
+
+
+          {trackedComplaint && (
+
+            <StatusTracker
+              complaintData={
+                trackedComplaint
+              }
+            />
+
+          )}
+
+        </section>
+
 
       </main>
 
     </div>
 
   );
+
 }
 
 

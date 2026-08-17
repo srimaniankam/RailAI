@@ -18,6 +18,7 @@ from database import (
     init_database,
     save_complaint,
     get_complaints,
+    get_complaint,
     update_complaint_status
 )
 
@@ -178,7 +179,11 @@ def extract_location(complaint):
 @app.post("/analyze")
 async def analyze_complaint(
 
-    complaint: str = Form(...),
+    complaint: str = Form(""),
+
+    train_number: str = Form(""),
+
+    coach: str = Form(""),
 
     image: UploadFile | None = File(None)
 
@@ -452,14 +457,14 @@ async def analyze_complaint(
     # EXTRACT TRAIN / COACH / LOCATION
     # =====================================================
 
-    coach = extract_coach(
+    coach = coach.strip().upper() or extract_coach(
 
         complaint
 
     )
 
 
-    train_number = extract_train_number(
+    train_number = train_number.strip() or extract_train_number(
 
         complaint
 
@@ -538,12 +543,15 @@ async def analyze_complaint(
     # SAVE
     # =====================================================
 
-    save_complaint(
+    complaint_id = save_complaint(
 
         result
 
     )
 
+    result["complaint_id"] = complaint_id
+
+    result["status"] = "Pending"
 
     return result
 
@@ -556,6 +564,25 @@ async def analyze_complaint(
 def complaints():
 
     return get_complaints()
+
+
+# =========================================================
+# GET ONE COMPLAINT
+# =========================================================
+
+@app.get("/complaints/{complaint_id}")
+def complaint_by_id(complaint_id: int):
+
+    complaint = get_complaint(complaint_id)
+
+    if complaint is None:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=404,
+            detail="Complaint not found."
+        )
+
+    return complaint
 
 
 # =========================================================
