@@ -2,9 +2,6 @@ import { useState } from "react";
 import OfficerDashboard from "./OfficerDashboard";
 import "./App.css";
 
-const API_URL =
-  "https://railai-backend-l6lr.onrender.com";
-
 function App() {
 
   // ==========================================
@@ -20,9 +17,6 @@ function App() {
     useState("");
 
   const [selectedImage, setSelectedImage] =
-    useState(null);
-
-  const [trackingComplaint, setTrackingComplaint] =
     useState(null);
 
   const [result, setResult] =
@@ -299,7 +293,7 @@ function App() {
       const response =
         await fetch(
 
-          `${API_URL}/analyze`,
+          "http://127.0.0.1:8000/analyze",
 
           {
 
@@ -377,71 +371,6 @@ function App() {
     }
 
   };
-
-
-  // ==========================================
-  // TRACK SPECIFIC COMPLAINT
-  // ==========================================
-
-  useEffect(() => {
-    if (!trackingComplaint?.id) {
-      return;
-    }
-
-    const fetchComplaintStatus = async () => {
-      try {
-        const response = await fetch(
-          `${API_URL}/complaints`
-        );
-
-        if (!response.ok) {
-          return;
-        }
-
-        const data = await response.json();
-
-        const currentComplaint = data.find(
-          item =>
-            Number(item.id) ===
-            Number(trackingComplaint.id)
-        );
-
-        if (currentComplaint) {
-          setTrackingComplaint({
-            id: currentComplaint.id,
-            status:
-              currentComplaint.status ||
-              "Pending",
-            train_number:
-              currentComplaint.train_number ||
-              trainNumber,
-            coach:
-              currentComplaint.coach ||
-              coachNumber,
-            department:
-              currentComplaint.department ||
-              "General Helpdesk"
-          });
-        }
-      } catch (error) {
-        console.error(
-          "Status tracking error:",
-          error
-        );
-      }
-    };
-
-    fetchComplaintStatus();
-
-    const interval = setInterval(
-      fetchComplaintStatus,
-      5000
-    );
-
-    return () => {
-      clearInterval(interval);
-    };
-  }, [trackingComplaint?.id]);
 
 
   // ==========================================
@@ -578,6 +507,88 @@ function App() {
         ==================================== */}
 
         <section className="complaint-card">
+
+
+          {/* ==================================
+              TRAIN & COACH DETAILS
+          ================================== */}
+
+          <div
+            className="journey-details"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "12px",
+              marginBottom: "14px"
+            }}
+          >
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: "600",
+                  marginBottom: "6px"
+                }}
+              >
+                Train Number
+              </label>
+
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="e.g. 12727"
+                value={trainNumber}
+                onChange={(event) => {
+                  setTrainNumber(
+                    event.target.value
+                  );
+                  setResult(null);
+                }}
+                style={{
+                  width: "100%",
+                  boxSizing: "border-box",
+                  padding: "12px",
+                  border: "1px solid #d9deea",
+                  borderRadius: "10px",
+                  fontSize: "15px",
+                  outline: "none"
+                }}
+              />
+            </div>
+
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: "600",
+                  marginBottom: "6px"
+                }}
+              >
+                Coach Number
+              </label>
+
+              <input
+                type="text"
+                placeholder="e.g. B2"
+                value={coachNumber}
+                onChange={(event) => {
+                  setCoachNumber(
+                    event.target.value
+                  );
+                  setResult(null);
+                }}
+                style={{
+                  width: "100%",
+                  boxSizing: "border-box",
+                  padding: "12px",
+                  border: "1px solid #d9deea",
+                  borderRadius: "10px",
+                  fontSize: "15px",
+                  outline: "none"
+                }}
+              />
+            </div>
+          </div>
 
 
           {/* ==================================
@@ -758,105 +769,6 @@ function App() {
 
         </section>
 
-
-        {/* ====================================
-            COMPLAINT STATUS TRACKING
-        ==================================== */}
-
-        {trackingComplaint && (
-          <section className="tracking-card">
-            <div className="tracking-header">
-              <div>
-                <span className="tracking-label">
-                  Complaint Tracking
-                </span>
-                <h2>
-                  Complaint #{trackingComplaint.id}
-                </h2>
-              </div>
-
-              <strong className="tracking-current-status">
-                {trackingComplaint.status}
-              </strong>
-            </div>
-
-            <div className="tracking-details">
-              <div>
-                <span>Train</span>
-                <strong>
-                  {trackingComplaint.train_number || "Not available"}
-                </strong>
-              </div>
-
-              <div>
-                <span>Coach</span>
-                <strong>
-                  {trackingComplaint.coach || "Not available"}
-                </strong>
-              </div>
-
-              <div>
-                <span>Department</span>
-                <strong>
-                  {trackingComplaint.department || "General Helpdesk"}
-                </strong>
-              </div>
-            </div>
-
-            <div className="status-timeline">
-              {[
-                "Pending",
-                "Assigned",
-                "In Progress",
-                "Resolved"
-              ].map((status, index) => {
-                const order = {
-                  Pending: 1,
-                  Assigned: 2,
-                  "In Progress": 3,
-                  Resolved: 4
-                };
-
-                const currentOrder =
-                  order[trackingComplaint.status] || 1;
-
-                const statusOrder = order[status];
-                const completed =
-                  statusOrder <= currentOrder;
-
-                return (
-                  <div
-                    className={`status-step ${
-                      completed ? "status-completed" : ""
-                    }`}
-                    key={status}
-                  >
-                    <div className="status-dot">
-                      {completed ? "✓" : ""}
-                    </div>
-
-                    <span>{status}</span>
-
-                    {index < 3 && (
-                      <div
-                        className={`status-line ${
-                          statusOrder < currentOrder
-                            ? "status-line-completed"
-                            : ""
-                        }`}
-                      />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            <p className="tracking-note">
-              Status updates automatically when an officer
-              changes your complaint status.
-            </p>
-          </section>
-        )}
 
         {/* ====================================
             ERROR
