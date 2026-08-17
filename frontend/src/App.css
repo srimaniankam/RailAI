@@ -1209,3 +1209,56 @@ main {
   }
 
 }
+
+/* ==========================================
+   TRAIN & COACH INPUTS
+========================================== */
+
+.journey-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.journey-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.journey-field label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.journey-field input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border: 1px solid #d9d9d9;
+  border-radius: 10px;
+  background: #ffffff;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s ease,
+              box-shadow 0.2s ease;
+}
+
+.journey-field input:focus {
+  border-color: #555;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06);
+}
+
+.journey-field input::placeholder {
+  color: #999;
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+  .journey-details {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
